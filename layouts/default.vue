@@ -21,7 +21,7 @@
         </v-app-bar>
 
         <v-main>
-            <v-container fluid class="ma-0 pa-0">
+            <v-container fluid class="ma-0 pa-0" style="height: 100vh - 4em;">
                 <nuxt />
             </v-container>
         </v-main>
@@ -36,3 +36,5 @@ export default {
     },
 }
 </script>
+
+
