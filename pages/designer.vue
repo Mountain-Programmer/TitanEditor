@@ -334,7 +334,6 @@
                 </v-container>
             </v-container>
         </v-container>
-        
     </v-container>
 </template>
 
@@ -345,8 +344,16 @@ import Vue from 'vue'
 Vue.use(Konva, { prefix: 'konva' })
 import Properties from '../components/properties.vue'
 import '../plugins/aws-sdk-2.831.0.min.js'
-console.log(AWS);
-// import AWS from 'aws-sdk'
+
+// config aws 
+AWS.config.region = 'us-east-2' // Region
+AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+    IdentityPoolId: 'us-east-2:648c55da-43b4-4aea-8bd0-9425c3061c3f',
+});
+
+const AWSS3_ACCESS_POINT = 'arn:aws:s3:us-east-2:266624589417:accesspoint/titanfrontend';
+const AWS_CLOUDFRONT_BASEURL = "http://titanuiassets.s3.us-east-2.amazonaws.com/";
+let s3 = new AWS.S3(AWS.config);
 
 export default {
     data() {
@@ -376,21 +383,24 @@ export default {
     },
 
     mounted() {
-        let context = require.context(
-            '~/content/images',
-            false,
-            /\.(gif|jpe?g|tiff?|png|webp|bmp)$/,
-            'sync'
-        )
+        // let context = require.context(
+        //     '~/content/images',
+        //     false,
+        //     /\.(gif|jpe?g|tiff?|png|webp|bmp)$/,
+        //     'sync'
+        // )
 
-        let images = []
-        context.keys().forEach((key) => {
-            key = String(key)
-            this.image_cache[key] = {
-                render: context(key),
-                name: String(key).substr(key.lastIndexOf('/') + 1),
-            }
-        })
+        // let images = []
+        // context.keys().forEach((key) => {
+        //     key = String(key)
+        //     this.image_cache[key] = {
+        //         render: context(key),
+        //         name: String(key).substr(key.lastIndexOf('/') + 1),
+        //     }
+        // })
+
+        // switching to aws cdn to get images
+
 
         let bgcontext = require.context(
             '~/content/images/backgrounds',
@@ -434,38 +444,37 @@ export default {
             console.log('mouse entered rotater', this.stage.container().style)
             this.stage.container().style.cursor = 'auto'
         })
-
-
-        
-
     },
 
     created() {
-        
-        // ====================================================== SETUP AWS ====================================================================
-        
-        AWS.config.region = 'us-east-2' // Region
-        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-            IdentityPoolId: 'us-east-2:648c55da-43b4-4aea-8bd0-9425c3061c3f',
-        })
+    },
+
+    
+
+    async asyncData() {
         var params = {
-            Bucket: 'arn:aws:s3:us-east-2:266624589417:accesspoint/titanfrontend',
-            // Prefix: 'images/',
+            Bucket: AWSS3_ACCESS_POINT,
+            Prefix: 'images/'
         }
 
-        let s3 = new AWS.S3(AWS.config);
-        s3.listObjectsV2(params, function (err, data) {
+        let image_cache = {}
+        await s3.listObjectsV2(params, function (err, data) {
             if (err) {
                 console.log(err)
             } else {
-                data.Contents.forEach((obj, idx) => console.log(obj.Key))
+
+                data.Contents.forEach((obj, idx) => {
+                    // console.log(obj.Key)
+                    let name = obj.Key.substr(obj.Key.lastIndexOf('/') + 1);
+                    if( name.length > 1)
+                        image_cache[obj.Key] = {name: name, render: AWS_CLOUDFRONT_BASEURL + obj.Key}
+                    // image_cache[obj.Key].render = AWS_CLOUDFRONT_BASEURL + obj.Key;
+                })
             }
         })
 
+        return {image_cache};
 
-    },
-
-    async asyncData() {
     },
 
     methods: {
