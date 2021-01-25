@@ -344,7 +344,8 @@ import KonvaAPI from 'konva'
 import Vue from 'vue'
 Vue.use(Konva, { prefix: 'konva' })
 import Properties from '../components/properties.vue'
-
+import '../plugins/aws-sdk-2.831.0.min.js'
+console.log(AWS);
 // import AWS from 'aws-sdk'
 
 export default {
@@ -439,7 +440,7 @@ export default {
 
     },
 
-    updated() {
+    created() {
         
         // ====================================================== SETUP AWS ====================================================================
         
