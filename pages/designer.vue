@@ -345,15 +345,17 @@ Vue.use(Konva, { prefix: 'konva' })
 import Properties from '../components/properties.vue'
 import '../plugins/aws-sdk-2.831.0.min.js'
 
-// config aws 
+// config aws
 AWS.config.region = 'us-east-2' // Region
 AWS.config.credentials = new AWS.CognitoIdentityCredentials({
     IdentityPoolId: 'us-east-2:648c55da-43b4-4aea-8bd0-9425c3061c3f',
-});
+})
 
-const AWSS3_ACCESS_POINT = 'arn:aws:s3:us-east-2:266624589417:accesspoint/titanfrontend';
-const AWS_CLOUDFRONT_BASEURL = "http://titanuiassets.s3.us-east-2.amazonaws.com/";
-let s3 = new AWS.S3(AWS.config);
+const AWSS3_ACCESS_POINT =
+    'arn:aws:s3:us-east-2:266624589417:accesspoint/titanfrontend'
+const AWS_CLOUDFRONT_BASEURL =
+    'http://titanuiassets.s3.us-east-2.amazonaws.com/'
+let s3 = new AWS.S3(AWS.config)
 
 export default {
     data() {
@@ -383,40 +385,6 @@ export default {
     },
 
     mounted() {
-        // let context = require.context(
-        //     '~/content/images',
-        //     false,
-        //     /\.(gif|jpe?g|tiff?|png|webp|bmp)$/,
-        //     'sync'
-        // )
-
-        // let images = []
-        // context.keys().forEach((key) => {
-        //     key = String(key)
-        //     this.image_cache[key] = {
-        //         render: context(key),
-        //         name: String(key).substr(key.lastIndexOf('/') + 1),
-        //     }
-        // })
-
-        // switching to aws cdn to get images
-
-
-        let bgcontext = require.context(
-            '~/content/images/backgrounds',
-            false,
-            /\.(gif|jpe?g|tiff?|png|webp|bmp)$/,
-            'sync'
-        )
-
-        bgcontext.keys().forEach((key) => {
-            key = String(key)
-            this.background_image_cache[key] = {
-                render: bgcontext(key),
-                name: String(key).substr(key.lastIndexOf('/') + 1),
-            }
-        })
-
         this.stage = this.$refs.stage._konvaNode
         this.SetCanvasBackground(Object.values(this.background_image_cache)[0])
         let transformer = new KonvaAPI.Transformer({
@@ -446,35 +414,41 @@ export default {
         })
     },
 
-    created() {
-    },
-
-    
+    created() {},
 
     async asyncData() {
         var params = {
             Bucket: AWSS3_ACCESS_POINT,
-            Prefix: 'images/'
+            Prefix: 'images/',
         }
 
         let image_cache = {}
+        let background_image_cache = {}
         await s3.listObjectsV2(params, function (err, data) {
             if (err) {
                 console.log(err)
             } else {
-
                 data.Contents.forEach((obj, idx) => {
                     // console.log(obj.Key)
-                    let name = obj.Key.substr(obj.Key.lastIndexOf('/') + 1);
-                    if( name.length > 1)
-                        image_cache[obj.Key] = {name: name, render: AWS_CLOUDFRONT_BASEURL + obj.Key}
-                    // image_cache[obj.Key].render = AWS_CLOUDFRONT_BASEURL + obj.Key;
+                    let name = obj.Key.substr(obj.Key.lastIndexOf('/') + 1)
+                    if (name.length > 1)
+                    // if the image is a background image dont put it in the regular image cache
+                        if (obj.Key.startsWith('images/backgrounds')) {
+                            background_image_cache[obj.Key] = {
+                                name: name,
+                                render: AWS_CLOUDFRONT_BASEURL + obj.Key,
+                            }
+                        } else {
+                            image_cache[obj.Key] = {
+                                name: name,
+                                render: AWS_CLOUDFRONT_BASEURL + obj.Key,
+                            }
+                        }
                 })
             }
         })
 
-        return {image_cache};
-
+        return { image_cache, background_image_cache }
     },
 
     methods: {
@@ -508,9 +482,16 @@ export default {
 
         SetCanvasBackground(image) {
             console.log(image)
-            let img = document.createElement('img')
-            img.src = image.render
-            img.onload = () => (this.background_image = img)
+            if(image?.render) {
+                let img = document.createElement('img')
+                img.src = image.render // the default background image
+                img.onload = () => (this.background_image = img)
+            } else {
+                let img = document.createElement('img');
+                img.src = 'https://titanuiassets.s3.us-east-2.amazonaws.com/images/backgrounds/bo3_thegiant+(1).png' // the default background image
+                img.onload = () => (this.background_image = img)
+
+            }
         },
 
         AddImage(image) {
