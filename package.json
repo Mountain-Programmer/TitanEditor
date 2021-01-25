@@ -11,9 +11,13 @@
   "dependencies": {
     "@nuxt/content": "^1.9.0",
     "@nuxtjs/axios": "^5.12.2",
+    "aws-sdk": "^2.831.0",
     "core-js": "^3.6.5",
     "fabric": "^4.3.0",
-    "nuxt": "^2.14.6"
+    "konva": "^7.2.2",
+    "nuxt": "^2.14.6",
+    "prism-themes": "^1.5.0",
+    "vue-konva": "^2.1.6"
   },
   "devDependencies": {
     "@nuxtjs/vuetify": "^1.11.2",

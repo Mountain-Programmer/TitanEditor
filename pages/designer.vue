@@ -126,6 +126,14 @@
                 @click="backgroundimage_overlay = !backgroundimage_overlay"
                 >Change Background</v-btn
             >
+            <v-btn
+                dense
+                outlined
+                color="blue"
+                class="mx-4 my-4"
+                href="http://localhost:3001/download"
+                >Download HUD Pack</v-btn
+            >
             <v-overlay
                 :value="backgroundimage_overlay"
                 opacity=".55"
@@ -234,7 +242,7 @@
                                     height="75px"
                                     class="ma-auto cursor-grab"
                                     gradient=""
-                                    @click="AddImageToCanvas(image)"
+                                    @click="AddImage(image)"
                                 ></v-img>
                                 <p
                                     fluid
@@ -255,99 +263,114 @@
             class="ma-auto pa-auto d-flex"
             style="justify-content: center"
         >
-            <canvas
-                id="DesignerView"
-                width="1280"
-                height="720"
-                class="ma-auto pa-auto flex-center"
-            ></canvas>
+            <konva-stage
+                ref="stage"
+                :config="{ width: 1280, height: 720 }"
+                style="border: 1px solid white"
+                @click="canvasClicked"
+            >
+                <konva-layer ref="background">
+                    <konva-image
+                        :config="{
+                            image: background_image,
+                            width: 1280,
+                            height: 720,
+                        }"
+                    ></konva-image>
+
+                    <span v-for="image in canvas_images">
+                        <konva-image
+                            :config="{ image: image, draggable: true }"
+                            @click="clickHandler"
+                            @mouseenter="mouseEnterHandler"
+                            @mouseleave="mouseLeaveHandler"
+                            @dragstart="dragStartHandler"
+                            @dragend="dragEndHandler"
+                            @dragmove="dragMoveHandler"
+                            @transform="transformHandler"
+                        ></konva-image>
+                    </span>
+                </konva-layer>
+            </konva-stage>
         </v-container>
-        
+
         <v-container style="width: 25em" class="ma-0 pa-0 grey darken-4">
-            <properties :element="currently_selected"/>
+            <properties :element="test_element" @change="UserSetProperty" />
             <v-container fluid class="ma-0 pa-0">
                 <p class="text-center blue--text ma-0 mt-1">Layers</p>
                 <v-divider></v-divider>
+                <v-container
+                    v-if="typeof layer != 'undefined'"
+                    style="overflow: auto; max-height: 25em"
+                >
+                    <v-row
+                        v-for="item in layer
+                            .getChildren((c) => c.getClassName() == 'Image')
+                            .toArray()"
+                        :key="item.name()"
+                        class="d-flex ma-0 pa-0"
+                    >
+                        <v-col cols="2">
+                            <v-btn
+                                icon
+                                @click="LayerVisibilityUpdate"
+                                width="20px"
+                            >
+                                <v-icon width="20px"> mdi-eye </v-icon>
+                            </v-btn>
+                        </v-col>
+                        <v-col cols="4">
+                            <v-img
+                                contain
+                                :src="item.attrs.image.currentSrc"
+                                width="50px"
+                            >
+                            </v-img>
+                        </v-col>
+                        <v-col>
+                            <p>{{ 'asdjhagjdhsg' + item.name() }}</p>
+                        </v-col>
+                    </v-row>
+                </v-container>
             </v-container>
         </v-container>
+        
     </v-container>
 </template>
 
 <script>
-import { fabric } from 'fabric'
-import * as DesignerClasses from '~/modules/designer.js'
+import Konva from 'vue-konva'
+import KonvaAPI from 'konva'
+import Vue from 'vue'
+Vue.use(Konva, { prefix: 'konva' })
 import Properties from '../components/properties.vue'
 
-
-// interface for a 'layer'
-fabric.ILayer = fabric.util.createClass(fabric.Object, {
-    type: 'Layer',
-
-    initialize: function (layer_id) {
-        this.layer_id = layer_id || ''
-    },
-
-    toString: function () {
-        return this.callSuper('toString') + `(layer_id) ${this.layer_id}`
-    },
-
-    toObject: function () {
-        return fabric.util.object.extend(this.callSuper('toObject'), {
-            layer_id: this.get('layer_id'),
-        })
-    },
-})
-
-fabric.UIImage = fabric.util.createClass(fabric.Image, {
-    type: 'UIImage',
-
-    initialize: function (element, options, layer_id) {
-        this.callSuper('initialize', element, options)
-        this.set('name', layer_id)
-    },
-
-    toString: function () {
-        return this.callSuper('toString') + `(layer_id) ${this.layer_id}`
-    },
-
-    toObject: function () {
-        return fabric.util.object.extend(this.callSuper('toObject'), {
-            layer_id: this.get('layer_id'),
-        })
-    },
-})
-
-fabric.UIText = fabric.util.createClass(fabric.Text, {
-    type: 'UIText',
-
-    initialize: function (layer_id) {
-        this.callSuper('initialize')
-        this.layer_id = layer_id || ''
-    },
-
-    toString: function () {
-        return this.callSuper('toString') + ` (layer_id) ${this.layer_id}`
-    },
-
-    toObject: function () {
-        return fabric.util.object.extend(this.callSuper('toObject'), {
-            layer_id: this.get('layer_id'),
-        })
-    },
-})
+// import AWS from 'aws-sdk'
 
 export default {
     data() {
         return {
- 
             image_cache: {},
             image_overlay: false,
             background_image_cache: {},
             backgroundimage_overlay: false,
-            background_image: {},
+            background_image: new window.Image(),
             search_str: '',
-            canvas: {},
-            currently_selected: null,
+            stage: {},
+            canvas_images: [],
+            transformer: {},
+            selected_element: {},
+            test_element: {
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+                scaleX: 0,
+                scaleY: 0,
+                name: '',
+                imgsrc: '',
+            },
+            layer: undefined,
         }
     },
 
@@ -383,23 +406,70 @@ export default {
             }
         })
 
-        this.canvas = new fabric.Canvas('DesignerView', {
-            selectionBorderColor: 'blue',
+        this.stage = this.$refs.stage._konvaNode
+        this.SetCanvasBackground(Object.values(this.background_image_cache)[0])
+        let transformer = new KonvaAPI.Transformer({
+            anchorFill: '#00beff',
+            anchorCornerRadius: 0,
+            anchorSize: 9,
+            rotateAnchorOffset: 20,
+            borderStrokeWidth: 2,
+            borderStroke: '#00aaff',
         })
 
-        fabric.Image.fromURL(
-            require('~/content/images/backgrounds/bo3_thegiant (1).png'),
-            (img) => {
-                this.canvas.setBackgroundImage(
-                    img,
-                    this.canvas.renderAll.bind(this.canvas),
-                    {
-                        scaleX: this.canvas.width / img.width,
-                        scaleY: this.canvas.height / img.height,
-                    }
-                )
+        this.layer = this.$refs.background._konvaNode
+        this.layer.add(transformer)
+        console.log(this.layer.getChildren().toArray())
+        this.transformer = transformer
+        this.transformer.children[9].off('mouseenter')
+
+        this.transformer.children[9].on('mouseenter', (evt) => {
+            console.log('mouse entered rotater', this.stage.container().style)
+            this.stage.container().style.cursor =
+                'url("/rotate.svg") 16 16, auto'
+        })
+
+        this.transformer.children[9].on('mouseleave', (evt) => {
+            console.log('mouse entered rotater', this.stage.container().style)
+            this.stage.container().style.cursor = 'auto'
+        })
+
+
+    // ====================================================== SETUP AWS ====================================================================
+        // Cognito_TitanUIAccessPoolAuth_Role
+        // Cognito_TitanUIAccessPoolUnauth_Role
+        // Titan-AllowUserUnauthListObjects
+        // Initialize the Amazon Cognito credentials provider
+        // AWS.config.region = 'us-east-2' // Region
+        // AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+        //     IdentityPoolId: 'us-east-2:648c55da-43b4-4aea-8bd0-9425c3061c3f',
+        // })
+        var params = {
+            Bucket: 'arn:aws:s3:::titanuiassets',
+            Prefix: 'images/',
+        }
+
+        let s3 = new AWS.S3(AWS.config);
+        s3.listObjectsV2(params, function (err, data) {
+            if (err) {
+                console.log(err)
+            } else {
+                data.Contents.forEach((obj, idx) => console.log(obj.Key))
             }
-        )
+        })
+
+        
+
+    },
+
+    created() {
+        // img.onload = () => {
+        //     // set image only when it is loaded
+        //     this.background_image = img
+        // }
+    },
+
+    async asyncData() {
     },
 
     methods: {
@@ -414,25 +484,6 @@ export default {
             })
 
             return result
-        },
-
-        AddImageToCanvas(image) {
-            
-            var img = document.createElement('img');
-            img.src = image.render;
-
-            let Image = new fabric.UIImage(img, {}, 'Image');
-            this.canvas.add(Image);
-            let setSelected = selected => this.currently_selected = selected;
-            Image.on('selected', function(options) {
-
-                console.log("image clicked", this.get('name'));
-                setSelected(this);
-                
-            });
-
-            // this.canvas.add(new fabric.UIImage(img, {}, image.name))
-            // console.log()
         },
 
         BackgroundImageSearch(search_str) {
@@ -451,17 +502,99 @@ export default {
         },
 
         SetCanvasBackground(image) {
-            let dimg = document.createElement('img')
-            dimg.src = image.render
-            let img = new fabric.Image(dimg)
-            this.canvas.setBackgroundImage(
-                img,
-                this.canvas.renderAll.bind(this.canvas),
-                {
-                    scaleX: this.canvas.width / img.width,
-                    scaleY: this.canvas.height / img.height,
-                }
-            )
+            console.log(image)
+            let img = document.createElement('img')
+            img.src = image.render
+            img.onload = () => (this.background_image = img)
+        },
+
+        AddImage(image) {
+            let img = document.createElement('img')
+            img.src = image.render
+            img.onload = () => {
+                this.canvas_images[this.canvas_images.length] = img
+                console.log('img loaded', this.canvas_images)
+            }
+        },
+
+        clickHandler(evt) {
+            console.log(evt.target.getType())
+            this.selected_element = evt.target
+
+            this.transformer.nodes([evt.target])
+            // evt.target.name('Image')
+            // console.log('selected: ', evt.target)
+            // this.test_element = evt.target.attrs
+            this.test_element.x = evt.target.x()
+            this.test_element.y = evt.target.y()
+            this.test_element.width = evt.target.width()
+            this.test_element.height = evt.target.height()
+            this.test_element.name = evt.target.name()
+            this.test_element.scaleX = evt.target.scaleX()
+            this.test_element.scaleY = evt.target.scaleY()
+            this.test_element.imgsrc = evt.target.attrs.image.currentSrc
+            this.test_element.type = evt.target.getType()
+
+            evt.cancelBubble = true
+        },
+
+        mouseEnterHandler(evt) {
+            this.stage.container().style.cursor = 'move'
+        },
+
+        mouseLeaveHandler(evt) {
+            this.stage.container().style.cursor = 'default'
+        },
+
+        dragStartHandler(evt) {},
+
+        dragMoveHandler(evt) {
+            this.selected_element = evt.target
+            this.test_element.x = evt.target.x()
+            this.test_element.y = evt.target.y()
+            this.test_element.width = evt.target.width()
+            this.test_element.height = evt.target.height()
+            this.test_element.name = evt.target.name()
+            this.test_element.scaleX = evt.target.scaleX()
+            this.test_element.scaleY = evt.target.scaleY()
+        },
+
+        transformHandler(evt) {
+            console.log(evt)
+            this.test_element.x = evt.target.x()
+            this.test_element.y = evt.target.y()
+            this.test_element.width = evt.target.width()
+            this.test_element.height = evt.target.height()
+            this.test_element.name = evt.target.name()
+            this.test_element.scaleX = evt.target.scaleX()
+            this.test_element.scaleY = evt.target.scaleY()
+            this.test_element.rotation = evt.target.getAttr('rotation')
+        },
+
+        dragEndHandler(evt) {},
+
+        canvasClicked(evt) {
+            this.transformer.nodes([])
+            console.log('canvas clicked', evt)
+        },
+
+        UserSetProperty(evt) {
+            console.log(Object.keys(evt))
+            Object.keys(evt).forEach((key) => {
+                console.log(this.test_element)
+                this.test_element[key] = evt[key]
+                console.log(Object.getOwnPropertyNames(this.selected_element))
+                if (
+                    Object.getOwnPropertyNames(this.selected_element).length > 1
+                )
+                    this.selected_element.setAttr(key, evt[key])
+            })
+            // this.selected_element.name(evt.name)
+            // console.log('user changed', evt)
+        },
+
+        LayerVisibilityUpdate(evt) {
+            console.log(evt)
         },
     },
 }
@@ -491,25 +624,23 @@ export default {
     cursor: pointer;
 }
 
-
- /* width */
+/* width */
 ::-webkit-scrollbar {
-  width: 10px;
+    width: 10px;
 }
 
 /* Track */
 ::-webkit-scrollbar-track {
-  background: #ff0000;
+    background: #ff0000;
 }
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  background: #888;
+    background: #888;
 }
 
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
-} 
-
+    background: #555;
+}
 </style>
