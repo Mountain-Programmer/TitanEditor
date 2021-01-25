@@ -435,18 +435,21 @@ export default {
         })
 
 
-    // ====================================================== SETUP AWS ====================================================================
-        // Cognito_TitanUIAccessPoolAuth_Role
-        // Cognito_TitanUIAccessPoolUnauth_Role
-        // Titan-AllowUserUnauthListObjects
-        // Initialize the Amazon Cognito credentials provider
-        // AWS.config.region = 'us-east-2' // Region
-        // AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-        //     IdentityPoolId: 'us-east-2:648c55da-43b4-4aea-8bd0-9425c3061c3f',
-        // })
+        
+
+    },
+
+    updated() {
+        
+        // ====================================================== SETUP AWS ====================================================================
+        
+        AWS.config.region = 'us-east-2' // Region
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+            IdentityPoolId: 'us-east-2:648c55da-43b4-4aea-8bd0-9425c3061c3f',
+        })
         var params = {
-            Bucket: 'arn:aws:s3:::titanuiassets',
-            Prefix: 'images/',
+            Bucket: 'arn:aws:s3:us-east-2:266624589417:accesspoint/titanfrontend',
+            // Prefix: 'images/',
         }
 
         let s3 = new AWS.S3(AWS.config);
@@ -458,15 +461,7 @@ export default {
             }
         })
 
-        
 
-    },
-
-    created() {
-        // img.onload = () => {
-        //     // set image only when it is loaded
-        //     this.background_image = img
-        // }
     },
 
     async asyncData() {
