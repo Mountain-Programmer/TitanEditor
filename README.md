@@ -18,3 +18,5 @@ $ npm run generate
 ```
 
 For detailed explanation on how things work, check out [Nuxt.js docs](https://nuxtjs.org).
+
+![Screenshot 1](https://github.com/Mountain-Programmer/TitanEditor/blob/master/screenshots/Screenshot_2021-01-26%20designer-frontend%20-%20designer-frontend.png)
