@@ -126,12 +126,20 @@
                 @click="backgroundimage_overlay = !backgroundimage_overlay"
                 >Change Background</v-btn
             >
-            <v-btn
+            <!-- <v-btn
                 dense
                 outlined
                 color="blue"
                 class="mx-4 my-4"
                 href="http://localhost:3001/download"
+                >Download HUD Pack</v-btn
+            > -->
+            <v-btn
+                dense
+                outlined
+                color="blue"
+                class="mx-4 my-4"
+                @click="InitializeLUAGenerator"
                 >Download HUD Pack</v-btn
             >
             <v-overlay
@@ -288,6 +296,7 @@
                             @dragend="dragEndHandler"
                             @dragmove="dragMoveHandler"
                             @transform="transformHandler"
+                            @load="canvasImageLoadedHandler"
                         ></konva-image>
                     </span>
                 </konva-layer>
@@ -334,6 +343,22 @@
                 </v-container>
             </v-container>
         </v-container>
+
+        <v-overlay :value="codePreviewEnabled">
+            <v-btn @click="codePreviewEnabled = !codePreviewEnabled">
+                <v-icon>mdi-alpha-x</v-icon>
+            </v-btn>
+            <v-row rows="12" style="background-color: black; overflow: auto" class="image-overlay-browser-body">
+                <v-cols cols="12">
+                    <pre lang="language-lua">
+                        <code>
+                            {{generatedCode}}
+
+                        </code>
+                    </pre>
+                </v-cols>
+            </v-row>
+        </v-overlay>
     </v-container>
 </template>
 
@@ -381,6 +406,8 @@ export default {
                 imgsrc: '',
             },
             layer: undefined,
+            codePreviewEnabled: false,
+            generatedCode: ''
         }
     },
 
@@ -432,8 +459,8 @@ export default {
                     // console.log(obj.Key)
                     let name = obj.Key.substr(obj.Key.lastIndexOf('/') + 1)
                     if (name.length > 1)
-                    // if the image is a background image dont put it in the regular image cache
                         if (obj.Key.startsWith('images/backgrounds')) {
+                            // if the image is a background image dont put it in the regular image cache
                             background_image_cache[obj.Key] = {
                                 name: name,
                                 render: AWS_CLOUDFRONT_BASEURL + obj.Key,
@@ -482,15 +509,15 @@ export default {
 
         SetCanvasBackground(image) {
             console.log(image)
-            if(image?.render) {
+            if (image?.render) {
                 let img = document.createElement('img')
-                img.src = image.render // the default background image
+                img.src = image.render
                 img.onload = () => (this.background_image = img)
             } else {
-                let img = document.createElement('img');
-                img.src = 'https://titanuiassets.s3.us-east-2.amazonaws.com/images/backgrounds/bo3_thegiant+(1).png' // the default background image
+                let img = document.createElement('img')
+                img.src =
+                    'https://titanuiassets.s3.us-east-2.amazonaws.com/images/backgrounds/bo3_thegiant+(1).png' // the default background image
                 img.onload = () => (this.background_image = img)
-
             }
         },
 
@@ -581,6 +608,37 @@ export default {
 
         LayerVisibilityUpdate(evt) {
             console.log(evt)
+        },
+
+        canvasImageLoadedHandler(evt) {
+            console.log(evt)
+        },
+
+        async InitializeLUAGenerator(evt) {
+            evt.preventDefault()
+            let stage = {}
+            this.layer
+                .getChildren()
+                .toArray()
+                .forEach((child, idx) => {
+                    if (child.getClassName() == 'Image') {
+                        // console.log(child.getAttr('image').src)
+
+                        stage[idx] = {
+                            imagesrc: child.getAttr('image').src,
+                            name: child.name(),
+                            clientRect: child.getClientRect(),
+                            classname: child.getClassName(),
+                            zindex: child.zIndex(),
+                        }
+                    }
+                })
+            console.log(stage)
+            this.$axios.$post('http://localhost:3001/download/', { stage }).then(response => {
+                console.log(response.generatedCode)
+                this.generatedCode = response.generatedCode;
+                this.codePreviewEnabled = true;
+            })
         },
     },
 }
